@@ -22,7 +22,7 @@ def run_bot():
     }
     ytdl = yt_dlp.YoutubeDL(yt_dpl_options)
 
-    ffmpeg_options = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5','options': '-vn -filter:a "volume=0.8"'}
+    ffmpeg_options = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5','options': '-vn -filter:a "volume=0.25"'}
 
     @client.event
     async def on_ready():
@@ -30,18 +30,18 @@ def run_bot():
 
     @client.event
     async def on_message(message):
-
-
         if message.content.startswith('?play'):
             if message.author.voice is None:
                 await message.channel.send("❌ You need to be in a voice channel first!")
                 return 0
 
-            try:
-                voice_client = await message.author.voice.channel.connect()
-                voice_clients[voice_client.guild.id] = voice_client
-            except Exception as e:
-                if 'connected to a voice' not in f'{e}':
+            voice_client = voice_clients.get(message.guild.id)
+
+            if voice_client is None or not voice_client.is_connected():
+                try:
+                    voice_client = await message.author.voice.channel.connect()
+                    voice_clients[message.guild.id] = voice_client
+                except Exception as e:
                     await message.channel.send(f"⚠️ Error connecting: {e}")
 
             try:
@@ -60,12 +60,11 @@ def run_bot():
                 song = data['url']
                 player = discord.FFmpegPCMAudio(song, **ffmpeg_options)
 
-                def after_play(err):
-                    if err:
-                        print(f"Player error: {err}")
-                    asyncio.run_coroutine_threadsafe(voice_client.disconnect(), loop)
+                if voice_client.is_playing():
+                    voice_client.stop()
 
-                voice_clients[message.guild.id].play(player, after=after_play)
+
+                voice_clients[message.guild.id].play(player)
                 await message.channel.send(f"🎶 Now playing: **{data['title']}** {url}")
 
             except Exception as e:
